@@ -54,8 +54,8 @@ desktop.ini
 # --- Databases & Data ---
 *.db
 *.sqlite3
-data/
-
+data/*
+!/data/.gitkeep
 # --- Logs and Temporary Files ---
 *.log
 logs/

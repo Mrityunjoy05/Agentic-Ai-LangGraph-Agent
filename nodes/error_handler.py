@@ -1,13 +1,11 @@
 """
 nodes/error_handler.py
 
-Node 9. Catches workflow failures from any upstream node and logs
-enough context to debug what went wrong.
+Safety net. Any node that sets workflow_status = 'error' routes here.
+Logs the failure context and ends the graph cleanly so the MemorySaver
+checkpoint captures the final state for inspection.
 
-We always end after this - no retries at this level. The MemorySaver
-checkpoint captures the final state so you can inspect it after the run.
-
-Reads  : error_message, workflow_status, topic, draft_version
+Reads  : error_message, workflow_status, topic
 Writes : workflow_status
 """
 
@@ -16,30 +14,23 @@ from __future__ import annotations
 import logging
 
 from config.settings import WorkflowStatus
-from core.state import TwitterAgentState
+from core.state import BlueskyAgentState
 
 logger = logging.getLogger(__name__)
 
 
 class ErrorHandlerNode:
-    """
-    Logs the failure context and marks the workflow as handled so the
-    graph ends cleanly rather than crashing mid-run.
-    """
 
-    def __call__(self, state: TwitterAgentState) -> TwitterAgentState:
+    def __call__(self, state: BlueskyAgentState) -> BlueskyAgentState:
         logger.error(
             "ErrorHandlerNode | WORKFLOW FAILED\n"
             "  topic          : %r\n"
             "  workflow_status: %r\n"
-            "  error_message  : %r\n"
-            "  draft_version  : %d",
+            "  error_message  : %r",
             state.get("topic"),
             state.get("workflow_status"),
             state.get("error_message"),
-            state.get("draft_version", 0),
         )
-
         return {
             **state,
             "workflow_status": WorkflowStatus.ERROR_HANDLED,

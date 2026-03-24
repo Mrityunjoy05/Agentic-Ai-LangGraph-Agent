@@ -1,23 +1,23 @@
 """
 nodes/human_approval.py
 
-Node 5. HITL interrupt #2 -- final approval before publishing.
+Node 6. HITL interrupt #2 - final approval before posting to Bluesky.
 
-With content_optimization and post_validation removed, this node receives
-final_draft directly from generate_post_content and shows it to the human.
+The human sees:
+  - The full post caption
+  - The image path (so they can open it locally and check)
+  - Character count
 
-The edit path now re-runs generate_post_content (via search_news -> human_review_news
-would be too far back, so we go back to the parallel generation nodes instead).
-Actually the cleanest approach: on edit, we write the instructions into state
-and route back to generate_post_content so it regenerates with the instructions
-added to the prompt context.
-
-Resume options:
+Resume with:
     Command(resume={"action": "approve"})
-    Command(resume={"action": "edit", "instructions": "make tweet 3 shorter"})
+    Command(resume={"action": "edit", "instructions": "make the opening punchier"})
     Command(resume={"action": "reject"})
 
-Reads  : final_draft
+On edit: instructions go into state as human_edits, graph routes back
+to generate_content which regenerates the post applying those instructions.
+The image is also regenerated since the image_prompt may change.
+
+Reads  : final_post, image_path
 Writes : approval_status, human_edits, workflow_status
 """
 
@@ -29,38 +29,31 @@ from typing import Literal
 from langgraph.types import Command, interrupt
 
 from config.settings import ApprovalStatus, WorkflowStatus
-from core.state import TwitterAgentState
+from core.state import BlueskyAgentState
 
 logger = logging.getLogger(__name__)
 
 
 class HumanApprovalNode:
-    """
-    Shows the assembled thread to the human and waits for their decision.
-    No validation scores anymore since post_validation is removed -- just
-    the raw draft with character counts so the human can judge for themselves.
-    """
 
     def __call__(
-        self, state: TwitterAgentState
-    ) -> Command[Literal["publish_to_x", "generate_post_content", "__end__"]]:
+        self, state: BlueskyAgentState
+    ) -> Command[Literal["publish_to_bluesky", "generate_content", "__end__"]]:
 
-        draft = state.get("final_draft") or []
+        final_post = state.get("final_post") or {}
+        image_path = state.get("image_path") or "not generated yet"
 
         decision = interrupt({
-            "question": "Review the final tweet draft. Approve, edit, or reject.",
-            "draft": [
-                {
-                    "tweet_number":    t["tweet_number"],
-                    "content":         t["content"],
-                    "character_count": t["character_count"],
-                }
-                for t in draft
-            ],
+            "question":    "Review the Bluesky post and image. Approve, edit, or reject.",
+            "post": {
+                "caption":    final_post.get("caption", ""),
+                "char_count": final_post.get("char_count", 0),
+            },
+            "image_path":  image_path,
             "instructions": (
                 "Resume with:\n"
                 "  Command(resume={'action': 'approve'})\n"
-                "  Command(resume={'action': 'edit', 'instructions': 'your edit notes here'})\n"
+                "  Command(resume={'action': 'edit', 'instructions': 'your notes here'})\n"
                 "  Command(resume={'action': 'reject'})"
             ),
         })
@@ -68,11 +61,7 @@ class HumanApprovalNode:
         action       = decision.get("action", "approve")
         instructions = decision.get("instructions", "")
 
-        logger.info(
-            "HumanApprovalNode | action=%r | has_instructions=%s",
-            action,
-            bool(instructions),
-        )
+        logger.info("HumanApprovalNode | action=%r | has_instructions=%s", action, bool(instructions))
 
         if action == "approve":
             return Command(
@@ -80,33 +69,30 @@ class HumanApprovalNode:
                     "approval_status": ApprovalStatus.APPROVED,
                     "workflow_status": WorkflowStatus.APPROVED_FOR_PUBLISH,
                 },
-                goto="publish_to_x",
+                goto="publish_to_bluesky",
             )
 
         if action == "edit":
             if not instructions:
-                # edit chosen but nothing written -- just approve
-                logger.warning("HumanApprovalNode | edit chosen with no instructions -- auto-approving")
+                logger.warning("HumanApprovalNode | edit chosen with no instructions - auto-approving")
                 return Command(
                     update={
                         "approval_status": ApprovalStatus.APPROVED,
                         "workflow_status": WorkflowStatus.APPROVED_FOR_PUBLISH,
                     },
-                    goto="publish_to_x",
+                    goto="publish_to_bluesky",
                 )
-
-            # Store the edit instructions and regenerate the content
             return Command(
                 update={
                     "approval_status": ApprovalStatus.EDITED,
                     "human_edits":     instructions,
                     "workflow_status": WorkflowStatus.HUMAN_EDITED,
                 },
-                goto="generate_post_content",
+                goto="generate_content",
             )
 
-        # reject or anything unexpected
-        logger.info("HumanApprovalNode | rejected -- ending workflow")
+        # reject
+        logger.info("HumanApprovalNode | rejected - ending workflow")
         return Command(
             update={
                 "approval_status": ApprovalStatus.REJECTED,
