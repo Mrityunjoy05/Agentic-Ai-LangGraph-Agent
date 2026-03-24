@@ -122,7 +122,7 @@ graph TB
 |---|---|
 | Language | Python 3.9+ |
 | Agent Framework | LangGraph |
-| LLM | Claude claude-opus-4-5 via LangChain Anthropic |
+| LLM | Groq llama-3.1-8b-instant via LangChain Groq |
 | News Search | Tavily via langchain-tavily |
 | Image Generation | Stable Diffusion XL on Google Colab T4 GPU |
 | Image Server | Gradio (running on Colab, public URL) |
@@ -145,7 +145,7 @@ graph TB
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/bluesky-agent.git
+git clone https://github.com/yourusername/Agentic-Ai-LangGraph-Agent.git
 cd bluesky-agent
 ```
 
@@ -156,7 +156,7 @@ Using `uv` (recommended):
 ```bash
 uv venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
-uv pip install -r requirements.txt
+uv add -r requirements.txt
 ```
 
 Or with pip:
@@ -234,7 +234,7 @@ Edit `.env`:
 
 ```env
 # Claude LLM - get it from console.anthropic.com
-ANTHROPIC_API_KEY=your_anthropic_api_key
+GROQ_API_KEY=your_groq_api_key
 
 # Tavily news search - get it from app.tavily.com
 TAVILY_API_KEY=your_tavily_api_key
