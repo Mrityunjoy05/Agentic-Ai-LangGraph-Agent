@@ -1,14 +1,11 @@
 """
 config/settings.py
 
-All config and constants in one place. The main reason for this file is
-that I got tired of hunting down hardcoded strings and numbers scattered
-across nodes - if something needs tuning (retry cap, model name, thread
-length), you change it here and nowhere else.
+All config and constants for the LinkedIn Image Post Agent.
+Change things here and every file picks it up automatically.
 
-All API keys are read from environment variables at import time. If a
-required key is missing you'll get a KeyError immediately on startup,
-which is much better than a cryptic failure mid-run.
+Keys are read from .env at import time. Missing key = KeyError immediately,
+which is much better than a silent failure three nodes later.
 """
 
 from __future__ import annotations
@@ -17,63 +14,65 @@ import os
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
 
-# Load .env from the project root
 load_dotenv()
 
-
-# API credentials - frozen so nothing accidentally mutates them at runtime
 
 @dataclass(frozen=True)
 class GroqConfig:
     api_key: str = os.getenv('GROQ_API_KEY')
     model: str = "openai/gpt-oss-120b"
     max_tokens: int = 4096
-    temperature: float = 0.7
+    temperature: float = 0
+
 
 @dataclass(frozen=True)
 class TavilyConfig:
-    # TavilySearch reads TAVILY_API_KEY from the environment automatically,
-    # so no need to pass the key here unlike the old TavilySearchResults.
-    max_results: int = 8
-    search_depth: str = "advanced"     # "basic" is faster but misses a lot
+    # TavilySearch reads TAVILY_API_KEY from env automatically
+    max_results: int = 5
+    search_depth: str = "advanced"
     include_answer: bool = True
     include_raw_content: bool = False
 
 
-# @dataclass(frozen=True)
-# class XAPIConfig:
-#     bearer_token: str = field(default_factory=lambda: os.environ["X_BEARER_TOKEN"])
-#     api_key: str = field(default_factory=lambda: os.environ["X_API_KEY"])
-#     api_secret: str = field(default_factory=lambda: os.environ["X_API_SECRET"])
-#     access_token: str = field(default_factory=lambda: os.environ["X_ACCESS_TOKEN"])
-#     access_token_secret: str = field(default_factory=lambda: os.environ["X_ACCESS_TOKEN_SECRET"])
+@dataclass(frozen=True)
+class ImageGenConfig:
+    # The Gradio public URL from your running Google Colab cell
+    # e.g. "https://1234abcd.gradio.live"
+    gradio_url: str = os.getenv("GRADIO_URL")
+    negative_prompt: str = (
+        "cartoon, painting, illustration, blurry, deformed, ugly, "
+        "low quality, CGI, toy, fake, animated, artificial background"
+    )
+    steps: int = 50
+    guidance: float = 7.5
+    save_dir: str = "data"          # relative to project root, created if missing
 
 
-# Workflow behaviour - tweak these to adjust how the agent behaves
+@dataclass(frozen=True)
+class BlueskyConfig:
+    # Your Bluesky handle e.g. "yourname.bsky.social"
+    handle: str = os.getenv('BLUESKY_HANDLE')
+    # App password generated from Settings -> Privacy and Security -> App Passwords
+    app_password: str = os.getenv("BLUESKY_APP_PASSWORD")
+    # Bluesky API base URL - this never changes
+    api_url: str = "https://bsky.social"
+
 
 @dataclass(frozen=True)
 class WorkflowConfig:
-    # How many times the human can reject news before we give up
     max_search_retries: int = 3
-
-    # LLM generates this many hook options before picking the best
     hook_variants_count: int = 3
+    # Bluesky post character limit is 300 per post
+    max_post_chars: int = 290
+    graph_thread_id_prefix: str = "bluesky_agent_run"
 
-    min_thread_tweets: int = 5
-    max_thread_tweets: int = 8
-    max_media_attachments: int = 4     # X only allows 4 per tweet
-
-    graph_thread_id_prefix: str = "twitter_agent_run"
-
-
-# Status strings - used by nodes and routing functions.
-# Having them here means you rename in one place and every file gets it.
 
 class WorkflowStatus:
     STARTED                = "started"
     NEWS_FETCHED           = "news_fetched"
     NEWS_APPROVED          = "news_approved"
     NEWS_REJECTED          = "news_rejected_by_human"
+    IMAGE_GENERATED        = "image_generated"
     APPROVED_FOR_PUBLISH   = "approved_for_publish"
     HUMAN_EDITED           = "human_edited"
     REJECTED_BY_HUMAN      = "rejected_by_human"
@@ -96,10 +95,8 @@ class ApprovalStatus:
     REJECTED = "rejected"
 
 
-# Module-level singletons - import these directly instead of instantiating
-# new config objects in each file.
-
 groq_cfg  = GroqConfig()
 tavily_cfg     = TavilyConfig()
-# x_api_cfg      = XAPIConfig()
+image_gen_cfg  = ImageGenConfig()
+bluesky_cfg    = BlueskyConfig()
 workflow_cfg   = WorkflowConfig()

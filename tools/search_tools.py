@@ -30,6 +30,7 @@ class SearchTool:
     picks up the project-wide tavily_cfg singleton automatically.
     """
 
+
     def __init__(self, cfg: TavilyConfig = tavily_cfg) -> None:
         self._cfg = cfg
         self._client = TavilySearch(

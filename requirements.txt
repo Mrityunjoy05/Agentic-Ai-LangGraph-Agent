@@ -5,3 +5,13 @@ langchain-groq
 python-dotenv
 langchain-community
 langchain-tavily
+
+gradio-client
+Pillow
+atproto
+requests
+
+
+ipykernel
+
+streamlit
