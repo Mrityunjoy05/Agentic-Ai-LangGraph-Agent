@@ -1,4 +1,4 @@
-# 🦋 Bluesky Image Post Agent
+# Bluesky Image Post Agent
 
 A production-ready LangGraph agent that searches for the latest news on any topic, generates a professional Bluesky post and an AI image using Stable Diffusion XL, reviews everything with you through a Streamlit UI, and posts it directly to your Bluesky account.
 
